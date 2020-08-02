@@ -20,9 +20,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.speech.tts.TextToSpeech;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import android.text.Editable;
 import android.text.Spannable;
 import android.text.SpannableString;
@@ -35,8 +35,8 @@ import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageButton;
 import android.widget.TextView;
-import android.support.design.widget.Snackbar;
-import android.support.design.widget.TextInputEditText;
+import com.google.android.material.snackbar.Snackbar;
+import com.google.android.material.textfield.TextInputEditText;
 import java.util.List;
 import java.util.Locale;
 import org.tensorflow.lite.examples.bertqa.R;
@@ -70,7 +70,7 @@ public class QaActivity extends AppCompatActivity {
   protected void onCreate(Bundle savedInstanceState) {
     Log.v(TAG, "onCreate");
     super.onCreate(savedInstanceState);
-    setContentView(R.layout.activity_qa);
+    setContentView(R.layout.tfe_qa_activity_qa);
 
     // Get content of the selected dataset.
     int datasetPosition = getIntent().getIntExtra(DATASET_POSITION_KEY, -1);
@@ -247,7 +247,7 @@ public class QaActivity extends AppCompatActivity {
     int offset = content.indexOf(answer.text, 0);
     if (offset >= 0) {
       spanText.setSpan(
-          new BackgroundColorSpan(getColor(R.color.secondaryColor)),
+          new BackgroundColorSpan(getColor(R.color.tfe_qa_color_highlight)),
           offset,
           offset + answer.text.length(),
           Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);

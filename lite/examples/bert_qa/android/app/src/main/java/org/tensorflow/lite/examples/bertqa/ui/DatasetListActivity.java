@@ -15,7 +15,7 @@ limitations under the License.
 package org.tensorflow.lite.examples.bertqa.ui;
 
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import org.tensorflow.lite.examples.bertqa.R;
@@ -32,7 +32,7 @@ public class DatasetListActivity extends AppCompatActivity {
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
-    setContentView(R.layout.activity_dataset_list);
+    setContentView(R.layout.tfe_qa_activity_dataset_list);
 
     ListView listView = findViewById(R.id.dataset_list);
     assert listView != null;

@@ -27,6 +27,7 @@ import android.graphics.Color
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCaptureSession
@@ -42,10 +43,9 @@ import android.media.ImageReader.OnImageAvailableListener
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
-import android.support.v4.app.ActivityCompat
-import android.support.v4.app.DialogFragment
-import android.support.v4.app.Fragment
-import android.support.v4.content.ContextCompat
+import android.os.Process
+import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.Fragment
 import android.util.Log
 import android.util.Size
 import android.util.SparseIntArray
@@ -56,10 +56,10 @@ import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.app.ActivityCompat
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
-import kotlin.math.pow
 import org.tensorflow.lite.examples.posenet.lib.BodyPart
 import org.tensorflow.lite.examples.posenet.lib.Person
 import org.tensorflow.lite.examples.posenet.lib.Posenet
@@ -211,7 +211,7 @@ class PosenetActivity :
     inflater: LayoutInflater,
     container: ViewGroup?,
     savedInstanceState: Bundle?
-  ): View? = inflater.inflate(R.layout.activity_posenet, container, false)
+  ): View? = inflater.inflate(R.layout.tfe_pn_activity_posenet, container, false)
 
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     surfaceView = view.findViewById(R.id.surfaceView)
@@ -254,8 +254,8 @@ class PosenetActivity :
     grantResults: IntArray
   ) {
     if (requestCode == REQUEST_CAMERA_PERMISSION) {
-      if (grantResults.size != 1 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-        ErrorDialog.newInstance(getString(R.string.request_permission))
+      if (allPermissionsGranted(grantResults)) {
+        ErrorDialog.newInstance(getString(R.string.tfe_pn_request_permission))
           .show(childFragmentManager, FRAGMENT_DIALOG)
       }
     } else {
@@ -263,11 +263,14 @@ class PosenetActivity :
     }
   }
 
+  private fun allPermissionsGranted(grantResults: IntArray) = grantResults.all {
+    it == PackageManager.PERMISSION_GRANTED
+  }
+
   /**
    * Sets up member variables related to camera.
    */
   private fun setUpCameraOutputs() {
-
     val activity = activity
     val manager = activity!!.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     try {
@@ -312,7 +315,7 @@ class PosenetActivity :
     } catch (e: NullPointerException) {
       // Currently an NPE is thrown when the Camera2API is used but not supported on the
       // device this code runs.
-      ErrorDialog.newInstance(getString(R.string.camera_error))
+      ErrorDialog.newInstance(getString(R.string.tfe_pn_camera_error))
         .show(childFragmentManager, FRAGMENT_DIALOG)
     }
   }
@@ -321,7 +324,9 @@ class PosenetActivity :
    * Opens the camera specified by [PosenetActivity.cameraId].
    */
   private fun openCamera() {
-    val permissionCamera = ContextCompat.checkSelfPermission(activity!!, Manifest.permission.CAMERA)
+    val permissionCamera = getContext()!!.checkPermission(
+      Manifest.permission.CAMERA, Process.myPid(), Process.myUid()
+    )
     if (permissionCamera != PackageManager.PERMISSION_GRANTED) {
       requestCameraPermission()
     }
@@ -438,11 +443,7 @@ class PosenetActivity :
       )
       image.close()
 
-      // Process an image for analysis in every 3 frames.
-      frameCounter = (frameCounter + 1) % 3
-      if (frameCounter == 0) {
-        processImage(rotatedBitmap)
-      }
+      processImage(rotatedBitmap)
     }
   }
 
@@ -492,13 +493,33 @@ class PosenetActivity :
 
   /** Draw bitmap on Canvas.   */
   private fun draw(canvas: Canvas, person: Person, bitmap: Bitmap) {
-    val screenWidth: Int = canvas.width
-    val screenHeight: Int = canvas.height
+    canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+    // Draw `bitmap` and `person` in square canvas.
+    val screenWidth: Int
+    val screenHeight: Int
+    val left: Int
+    val right: Int
+    val top: Int
+    val bottom: Int
+    if (canvas.height > canvas.width) {
+      screenWidth = canvas.width
+      screenHeight = canvas.width
+      left = 0
+      top = (canvas.height - canvas.width) / 2
+    } else {
+      screenWidth = canvas.height
+      screenHeight = canvas.height
+      left = (canvas.width - canvas.height) / 2
+      top = 0
+    }
+    right = left + screenWidth
+    bottom = top + screenHeight
+
     setPaint()
     canvas.drawBitmap(
       bitmap,
-      Rect(0, 0, previewHeight, previewWidth),
-      Rect(0, 0, screenWidth, screenHeight),
+      Rect(0, 0, bitmap.width, bitmap.height),
+      Rect(left, top, right, bottom),
       paint
     )
 
@@ -509,8 +530,8 @@ class PosenetActivity :
     for (keyPoint in person.keyPoints) {
       if (keyPoint.score > minConfidence) {
         val position = keyPoint.position
-        val adjustedX: Float = position.x.toFloat() * widthRatio
-        val adjustedY: Float = position.y.toFloat() * heightRatio
+        val adjustedX: Float = position.x.toFloat() * widthRatio + left
+        val adjustedY: Float = position.y.toFloat() * heightRatio + top
         canvas.drawCircle(adjustedX, adjustedY, circleRadius, paint)
       }
     }
@@ -521,10 +542,10 @@ class PosenetActivity :
         (person.keyPoints[line.second.ordinal].score > minConfidence)
       ) {
         canvas.drawLine(
-          person.keyPoints[line.first.ordinal].position.x.toFloat() * widthRatio,
-          person.keyPoints[line.first.ordinal].position.y.toFloat() * heightRatio,
-          person.keyPoints[line.second.ordinal].position.x.toFloat() * widthRatio,
-          person.keyPoints[line.second.ordinal].position.y.toFloat() * heightRatio,
+          person.keyPoints[line.first.ordinal].position.x.toFloat() * widthRatio + left,
+          person.keyPoints[line.first.ordinal].position.y.toFloat() * heightRatio + top,
+          person.keyPoints[line.second.ordinal].position.x.toFloat() * widthRatio + left,
+          person.keyPoints[line.second.ordinal].position.y.toFloat() * heightRatio + top,
           paint
         )
       }
@@ -533,19 +554,19 @@ class PosenetActivity :
     canvas.drawText(
       "Score: %.2f".format(person.score),
       (15.0f * widthRatio),
-      (233.0f * heightRatio),
+      (30.0f * heightRatio + bottom),
       paint
     )
     canvas.drawText(
       "Device: %s".format(posenet.device),
       (15.0f * widthRatio),
-      (243.0f * heightRatio),
+      (50.0f * heightRatio + bottom),
       paint
     )
     canvas.drawText(
       "Time: %.2f ms".format(posenet.lastInferenceTimeNanos * 1.0f / 1_000_000),
       (15.0f * widthRatio),
-      (253.0f * heightRatio),
+      (70.0f * heightRatio + bottom),
       paint
     )
 
@@ -564,7 +585,7 @@ class PosenetActivity :
     // Perform inference.
     val person = posenet.estimateSinglePose(scaledBitmap)
     val canvas: Canvas = surfaceHolder!!.lockCanvas()
-    draw(canvas, person, bitmap)
+    draw(canvas, person, scaledBitmap)
   }
 
   /**
@@ -572,7 +593,6 @@ class PosenetActivity :
    */
   private fun createCameraPreviewSession() {
     try {
-
       // We capture images from preview in YUV format.
       imageReader = ImageReader.newInstance(
         previewSize!!.width, previewSize!!.height, ImageFormat.YUV_420_888, 2

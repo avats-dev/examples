@@ -17,8 +17,8 @@ package org.tensorflow.lite.examples.bertqa.ml;
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
-import android.support.annotation.WorkerThread;
 import android.util.Log;
+import androidx.annotation.WorkerThread;
 import com.google.common.base.Joiner;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -36,7 +36,7 @@ import java.util.Map;
 import org.tensorflow.lite.Interpreter;
 
 /** Interface to load TfLite model and provide predictions. */
-public class QaClient {
+public class QaClient implements AutoCloseable {
   private static final String TAG = "BertDemo";
   private static final String MODEL_PATH = "model.tflite";
   private static final String DIC_PATH = "vocab.txt";
@@ -88,7 +88,15 @@ public class QaClient {
 
   @WorkerThread
   public synchronized void unload() {
-    tflite.close();
+    close();
+  }
+
+  @Override
+  public void close() {
+    if (tflite != null) {
+      tflite.close();
+      tflite = null;
+    }
     dic.clear();
   }
 
@@ -162,10 +170,10 @@ public class QaClient {
     List<QaAnswer.Pos> origResults = new ArrayList<>();
     for (int start : startIndexes) {
       for (int end : endIndexes) {
-        if (!feature.tokenToOrigMap.containsKey(start)) {
+        if (!feature.tokenToOrigMap.containsKey(start + OUTPUT_OFFSET)) {
           continue;
         }
-        if (!feature.tokenToOrigMap.containsKey(end)) {
+        if (!feature.tokenToOrigMap.containsKey(end + OUTPUT_OFFSET)) {
           continue;
         }
         if (end < start) {

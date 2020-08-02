@@ -19,8 +19,8 @@ package org.tensorflow.lite.examples.textclassification;
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
-import android.support.annotation.WorkerThread;
 import android.util.Log;
+import androidx.annotation.WorkerThread;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -41,8 +41,8 @@ import org.tensorflow.lite.Interpreter;
 public class TextClassificationClient {
   private static final String TAG = "TextClassificationDemo";
   private static final String MODEL_PATH = "text_classification.tflite";
-  private static final String DIC_PATH = "vocab.txt";
-  private static final String LABEL_PATH = "labels.txt";
+  private static final String DIC_PATH = "text_classification_vocab.txt";
+  private static final String LABEL_PATH = "text_classification_labels.txt";
 
   private static final int SENTENCE_LEN = 256;  // The maximum length of an input sentence.
   // Simple delimiter to split words.

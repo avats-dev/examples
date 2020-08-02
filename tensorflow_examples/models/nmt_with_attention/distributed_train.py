@@ -21,11 +21,12 @@ from __future__ import print_function
 
 from absl import app
 from absl import flags
-import tensorflow as tf # TF2
+
+import tensorflow as tf
 from tensorflow_examples.models.nmt_with_attention import nmt
 from tensorflow_examples.models.nmt_with_attention import utils
 from tensorflow_examples.models.nmt_with_attention.train import Train
-assert tf.__version__.startswith('2')
+
 
 FLAGS = flags.FLAGS
 
@@ -119,8 +120,8 @@ def main(epochs, enable_function, buffer_size, batch_size, download_path,
     vocab_inp_size = len(inp_lang.word_index) + 1
     vocab_tar_size = len(targ_lang.word_index) + 1
 
-    num_train_steps_per_epoch = tf.data.experimental.cardinality(train_ds)
-    num_test_steps_per_epoch = tf.data.experimental.cardinality(test_ds)
+    num_train_steps_per_epoch = train_ds.cardinality()
+    num_test_steps_per_epoch = test_ds.cardinality()
 
     train_iterator = strategy.make_dataset_iterator(train_ds)
     test_iterator = strategy.make_dataset_iterator(test_ds)

@@ -17,7 +17,7 @@ package org.tensorflow.lite.examples.smartreply;
 
 import android.os.Bundle;
 import android.os.Handler;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
@@ -44,7 +44,7 @@ public class MainActivity extends AppCompatActivity {
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     Log.v(TAG, "onCreate");
-    setContentView(R.layout.main_activity);
+    setContentView(R.layout.tfe_sr_main_activity);
 
     client = new SmartReplyClient(getApplicationContext());
     handler = new Handler();

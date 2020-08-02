@@ -15,6 +15,7 @@
 import CoreImage
 import TensorFlowLite
 import UIKit
+import Accelerate
 
 /// Stores results for a particular frame that was successfully run through the `Interpreter`.
 struct Result {
@@ -57,6 +58,10 @@ class ModelDataHandler: NSObject {
   let inputWidth = 300
   let inputHeight = 300
 
+  // image mean and std for floating model, should be consistent with parameters used in model training
+  let imageMean: Float = 127.5
+  let imageStd:  Float = 127.5
+
   // MARK: Private properties
   private var labels: [String] = []
 
@@ -97,7 +102,7 @@ class ModelDataHandler: NSObject {
 
     // Specify the options for the `Interpreter`.
     self.threadCount = threadCount
-    var options = InterpreterOptions()
+    var options = Interpreter.Options()
     options.threadCount = threadCount
     do {
       // Create the `Interpreter`.
@@ -268,28 +273,56 @@ class ModelDataHandler: NSObject {
     isModelQuantized: Bool
   ) -> Data? {
     CVPixelBufferLockBaseAddress(buffer, .readOnly)
-    defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
-    guard let mutableRawPointer = CVPixelBufferGetBaseAddress(buffer) else {
+    defer {
+      CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
+    }
+    guard let sourceData = CVPixelBufferGetBaseAddress(buffer) else {
       return nil
     }
-    assert(CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_32BGRA)
-    let count = CVPixelBufferGetDataSize(buffer)
-    let bufferData = Data(bytesNoCopy: mutableRawPointer, count: count, deallocator: .none)
-    var rgbBytes = [UInt8](repeating: 0, count: byteCount)
-    var pixelIndex = 0
-    for component in bufferData.enumerated() {
-      let bgraComponent = component.offset % bgraPixel.channels;
-      let isAlphaComponent = bgraComponent == bgraPixel.alphaComponent;
-      guard !isAlphaComponent else {
-        pixelIndex += 1
-        continue
-      }
-      // Swizzle BGR -> RGB.
-      let rgbIndex = pixelIndex * rgbPixelChannels + (bgraPixel.lastBgrComponent - bgraComponent)
-      rgbBytes[rgbIndex] = component.element
+    
+    let width = CVPixelBufferGetWidth(buffer)
+    let height = CVPixelBufferGetHeight(buffer)
+    let sourceBytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
+    let destinationChannelCount = 3
+    let destinationBytesPerRow = destinationChannelCount * width
+    
+    var sourceBuffer = vImage_Buffer(data: sourceData,
+                                     height: vImagePixelCount(height),
+                                     width: vImagePixelCount(width),
+                                     rowBytes: sourceBytesPerRow)
+    
+    guard let destinationData = malloc(height * destinationBytesPerRow) else {
+      print("Error: out of memory")
+      return nil
     }
-    if isModelQuantized { return Data(bytes: rgbBytes) }
-    return Data(copyingBufferOf: rgbBytes.map { Float($0) / 255.0 })
+    
+    defer {
+      free(destinationData)
+    }
+
+    var destinationBuffer = vImage_Buffer(data: destinationData,
+                                          height: vImagePixelCount(height),
+                                          width: vImagePixelCount(width),
+                                          rowBytes: destinationBytesPerRow)
+    
+    if (CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_32BGRA){
+      vImageConvert_BGRA8888toRGB888(&sourceBuffer, &destinationBuffer, UInt32(kvImageNoFlags))
+    } else if (CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_32ARGB) {
+      vImageConvert_ARGB8888toRGB888(&sourceBuffer, &destinationBuffer, UInt32(kvImageNoFlags))
+    }
+
+    let byteData = Data(bytes: destinationBuffer.data, count: destinationBuffer.rowBytes * height)
+    if isModelQuantized {
+      return byteData
+    }
+
+    // Not quantized, convert to floats
+    let bytes = Array<UInt8>(unsafeData: byteData)!
+    var floats = [Float]()
+    for i in 0..<bytes.count {
+      floats.append((Float(bytes[i]) - imageMean) / imageStd)
+    }
+    return Data(copyingBufferOf: floats)
   }
 
   /// This assigns color for a particular class.

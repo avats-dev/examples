@@ -2,10 +2,13 @@
 # Last matching pattern takes preecedence.
 
 # Default owners for everything in repo.
-*  @wolffg @lamberta @MarkDaoust
-
-# TF Lite
-/lite/ @dansitu @jdduke
+*  @MarkDaoust @wolffg @yashk2810
 
 # Community docs
-/community/ @adammichaelwood
+/community/ @adammichaelwood @anirudh161 @lamberta @MarkDaoust @yashk2810
+
+# Courses
+/courses/ @josbecker @MarkDaoust
+
+# TF Lite
+/lite/ @jdduke @khanhlvg @lintian06 @yyoon

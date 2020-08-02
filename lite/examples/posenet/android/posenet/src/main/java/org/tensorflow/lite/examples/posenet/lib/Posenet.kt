@@ -81,12 +81,14 @@ class Posenet(
   /** An Interpreter for the TFLite model.   */
   private var interpreter: Interpreter? = null
   private var gpuDelegate: GpuDelegate? = null
+  private val NUM_LITE_THREADS = 4
 
   private fun getInterpreter(): Interpreter {
     if (interpreter != null) {
       return interpreter!!
     }
     val options = Interpreter.Options()
+    options.setNumThreads(NUM_LITE_THREADS)
     when (device) {
       Device.CPU -> { }
       Device.GPU -> {
@@ -126,13 +128,12 @@ class Posenet(
 
     val mean = 128.0f
     val std = 128.0f
-    for (row in 0 until bitmap.height) {
-      for (col in 0 until bitmap.width) {
-        val pixelValue = bitmap.getPixel(col, row)
-        inputBuffer.putFloat(((pixelValue shr 16 and 0xFF) - mean) / std)
-        inputBuffer.putFloat(((pixelValue shr 8 and 0xFF) - mean) / std)
-        inputBuffer.putFloat(((pixelValue and 0xFF) - mean) / std)
-      }
+    val intValues = IntArray(bitmap.width * bitmap.height)
+    bitmap.getPixels(intValues, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+    for (pixelValue in intValues) {
+      inputBuffer.putFloat(((pixelValue shr 16 and 0xFF) - mean) / std)
+      inputBuffer.putFloat(((pixelValue shr 8 and 0xFF) - mean) / std)
+      inputBuffer.putFloat(((pixelValue and 0xFF) - mean) / std)
     }
     return inputBuffer
   }
@@ -192,6 +193,7 @@ class Posenet(
    * returns:
    *      person: a Person object containing data about keypoint locations and confidence scores
    */
+  @Suppress("UNCHECKED_CAST")
   fun estimateSinglePose(bitmap: Bitmap): Person {
     val estimationStartTimeNanos = SystemClock.elapsedRealtimeNanos()
     val inputArray = arrayOf(initInputArray(bitmap))
@@ -228,7 +230,6 @@ class Posenet(
       var maxCol = 0
       for (row in 0 until height) {
         for (col in 0 until width) {
-          heatmaps[0][row][col][keypoint] = heatmaps[0][row][col][keypoint]
           if (heatmaps[0][row][col][keypoint] > maxVal) {
             maxVal = heatmaps[0][row][col][keypoint]
             maxRow = row
